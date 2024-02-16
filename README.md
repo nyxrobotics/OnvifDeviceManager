@@ -53,27 +53,13 @@ cd OnvifDeviceManager
 autogen.sh will attempt download and build missing dependencies.   
 **[Mandatory]** The following package dependencies are mandatory and are not yet automatically built:
 ```
-sudo apt install make
-sudo apt install bison 
-sudo apt install flex 
-sudo apt install libtool 
-sudo apt install pkg-config
-sudo apt install libgtk-3-dev
-sudo apt install g++
+sudo apt install -y make bison flex libtool pkg-config libgtk-3-dev g++
 ```
 **[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```
 sudo apt install python3-pip
-python3 -m pip install meson
-python3 -m pip install ninja
-python3 -m pip install cmake
-sudo apt install libssl-dev
-sudo apt install zlib1g-dev
-sudo apt install libasound2-dev
-sudo apt install libgudev-1.0-dev
-sudo apt install gettext
-sudo apt install libpulse-dev
-sudo apt install nasm
+python3 -m pip install meson ninja cmake
+sudo apt install -y libssl-dev zlib1g-dev libasound2-dev libgudev-1.0-dev gettext libpulse-dev nasm
 ```
 If your system already has gstreamer pre-installed, I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
 Note that autogen will automatically call "./configure".
@@ -82,10 +68,19 @@ Note that autogen will automatically call "./configure".
 ```
 
 ### Compile and install GUI App
+- Ubuntu
+```
+make
+sudo checkinstall --fstrans=no -yD --pkgname=onvif-device-manager --pkgversion=1.0 make install
+sudo dpkg -i onvif-device-manager_1.0-1_amd64.deb
+```
+
+- Others
 ```
 make
 make install
 ```
+
 # Note
 I have very little spare time to work on any personal project, so this might take a while.
 This is my very first C project, so I'm learning as I go. 
