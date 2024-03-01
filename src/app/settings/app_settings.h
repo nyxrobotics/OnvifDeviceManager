@@ -2,6 +2,8 @@
 #define ONVIF_APP_SETTINGS_H_
 
 #include <gtk/gtk.h>
+#include <errno.h>
+
 #include "../../queue/event_queue.h"
 
 #include "app_settings_stream.h"
