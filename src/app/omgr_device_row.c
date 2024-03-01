@@ -402,7 +402,15 @@ OnvifProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self){
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (ONVIFMGR_IS_DEVICEROW (self),NULL);
     C_DEBUG("OnvifMgrDeviceRow__get_profile");
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    OnvifMgrDeviceRowPrivate *priv =
+        OnvifMgrDeviceRow__get_instance_private(self);
+    if(!priv->profile){
+      C_DEBUG("OnvifMgrDeviceRow__get_profile - no profile");
+      return NULL;
+    } else {
+        C_DEBUG("OnvifMgrDeviceRow__get_profile - profile: %p",priv->profile);
+    }
+
     return priv->profile;
 }
 
@@ -420,42 +428,67 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     GError * error = NULL;
     OnvifSnapshot * snapshot = NULL;
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
-        return;
+    if (!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self) || self == NULL ||
+        !ONVIFMGR_IS_DEVICEROW(self)) {
+      C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+      return;
     }
-    
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-
+    C_TRACE("OnvifMgrDeviceRow__load_thumbnail - valid device");
+    OnvifMgrDeviceRowPrivate *priv =
+        OnvifMgrDeviceRow__get_instance_private(self);
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(priv->device);
-    if(oerror == ONVIF_ERROR_NONE){
-        OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
-        snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
-        if(!snapshot){
-            C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
-            goto warning;
-        }
-        image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
-    } else if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
-        image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
-    } else {
+    C_TRACE("OnvifMgrDeviceRow__load_thumbnail - error: %d",oerror);
+    if (oerror == ONVIF_ERROR_NONE) {
+      C_TRACE("OnvifMgrDeviceRow__load_thumbnail - no error -> get snapshot.");
+      OnvifMediaService *media_service =
+          OnvifDevice__get_media_service(priv->device);
+      if(media_service == NULL){
+          C_ERROR("OnvifMgrDeviceRow__load_thumbnail - Error retrieve media service.");
+          goto warning;
+      }
+      C_TRACE("OnvifMgrDeviceRow__load_thumbnail - media service: %p",media_service);
+      snapshot = OnvifMediaService__getSnapshot(
+          media_service, OnvifProfile__get_index(priv->profile));
+      C_TRACE("OnvifMgrDeviceRow__load_thumbnail - snapshot: %p",snapshot);
+      if (!snapshot || snapshot == NULL) {
+        C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
         goto warning;
+      }
+      C_TRACE("OnvifMgrDeviceRow__load_thumbnail - snapshot: %p",snapshot);
+      image = GtkBinaryImage__new(
+          (unsigned char *)OnvifSnapshot__get_buffer(snapshot),
+          OnvifSnapshot__get_size(snapshot), -1, 40, error);
+      C_TRACE("OnvifMgrDeviceRow__load_thumbnail - image: %p",image);
+    } else if (oerror == ONVIF_ERROR_NOT_AUTHORIZED) {
+      image = GtkStyledImage__new(
+          (unsigned char *)_binary_locked_icon_png_start,
+          _binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40,
+          error);
+    } else {
+      goto warning;
     }
 
-    //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
-        goto exit;
+    if (image == NULL) {
+      C_ERROR("OnvifMgrDeviceRow__load_thumbnail - no image");
+      goto warning;
     }
 
-    //Attempt to get downloaded pixbuf or locked icon
-    if(!image){
-        if(error->message){
-            C_ERROR("Error writing png to GtkPixbufLoader : %s",error->message);
-        } else {
-            C_ERROR("Error writing png to GtkPixbufLoader : [null]");
+        // Check is device is still valid. (User performed scan before snapshot
+        // finished)
+        if (!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)) {
+          C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+          goto exit;
         }
-    }
+
+        // Attempt to get downloaded pixbuf or locked icon
+        if (!image) {
+          if (error->message) {
+            C_ERROR("Error writing png to GtkPixbufLoader : %s",error->message);
+          } else {
+            C_ERROR("Error writing png to GtkPixbufLoader : [null]");
+          }
+        }
+        C_TRACE("OnvifMgrDeviceRow__load_thumbnail done.");
 
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)

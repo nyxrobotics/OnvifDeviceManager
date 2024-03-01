@@ -257,45 +257,58 @@ void onvif_display_device_row(OnvifApp * self, OnvifMgrDeviceRow * device){
     EventQueue__insert(self->queue,_display_onvif_device,device);
 }
 
-void _play_onvif_stream(void * user_data){
+void _play_onvif_stream(void *user_data) {
+    C_TRACE("_play_onvif_stream start");
     ONVIFMGR_DEVICEROW_TRACE("_play_onvif_stream %s",user_data);
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
 
-    //Check if device is still valid. (User performed scan before thread started)
+    // Check if device is still valid. (User performed scan before thread
+    // started)
+    C_TRACE("_play_onvif_stream - checking device");
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device)){
         C_TRAIL("_play_onvif_stream - invalid device.");
         goto exit;
     }
 
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
+    C_TRACE("_play_onvif_stream - get device");
+    OnvifDevice *odev = OnvifMgrDeviceRow__get_device(device);
+    C_TRACE("_play_onvif_stream - get app");
     OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
 
     /* Authentication check */
+    C_TRACE("_play_onvif_stream - authenticating device");
     OnvifDevice__authenticate(odev);
-
+    C_TRACE("_play_onvif_stream - checking status");
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
         goto exit;
     }
-    if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
+    if (OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE &&
+        OnvifMgrDeviceRow__is_selected(device)) {
+        C_TRAIL("_play_onvif_stream - device not authorized");
         goto exit;
     }
 
     /* Set the URI to play */
+    C_TRACE("_play_onvif_stream - set uri");
     char * uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
-    
-    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
+    C_TRACE("_play_onvif_stream - uri:%s",uri);
+    if (ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) &&
+        OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE) {
+        C_TRACE("_play_onvif_stream - playing");
         GstRtspPlayer__set_playback_url(app->player,uri);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
         GstRtspPlayer__set_port_fallback(app->player,port);
         free(port);
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
         GstRtspPlayer__set_credentials(app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
-
         GstRtspPlayer__play(app->player);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
+    } else {
+        C_TRAIL("_play_onvif_stream - device not authorized -> skip playing");
     }
+    C_TRACE("_play_onvif_stream - free uri");
     free(uri);
 
 exit:
@@ -323,35 +336,48 @@ gboolean * idle_update_pages(void * user_data){
     return FALSE;
 }
 
-int onvif_reload_device(OnvifMgrDeviceRow * device){
+int onvif_reload_device(OnvifMgrDeviceRow *device) {
+    C_TRAIL("onvif_reload_device:%s",device);
     OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
 
     /* Authentication check */
+    C_TRAIL("onvif_reload_device - authenticating device");
     OnvifDevice__authenticate(odev);
-    
-    //Check if device is valid and authorized (User performed scan before auth finished)
+
+    // Check if device is valid and authorized (User performed scan before auth
+    // finished)
+    C_TRAIL("onvif_reload_device - checking device");
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("onvif_reload_device - invalid device.");
         return 0;
     }
 
+    C_TRAIL("onvif_reload_device - device is valid");
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         return 0;
     }
 
-    //Replace locked image with spinner
+    // Replace locked image with spinner
+    C_TRAIL("onvif_reload_device - replacing image with spinner");
     GtkWidget * image = gtk_spinner_new ();
-    OnvifMgrDeviceRow__set_thumbnail(device,image);
-
-    OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
+    OnvifMgrDeviceRow__set_thumbnail(device, image);
+    OnvifApp *app = OnvifMgrDeviceRow__get_app(device);
+    C_TRAIL("onvif_reload_device - updating pages");
     onvif_display_device_row(app, device);
-
+    C_TRAIL("g_object_ref");
     g_object_ref(device);
-    gdk_threads_add_idle(G_SOURCE_FUNC(idle_update_pages),device);
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
-        safely_start_spinner(app->player_loading_handle);
-        g_object_ref(device);
-        _play_onvif_stream(device);
+    C_TRAIL("EventQueue__insert");
+    gdk_threads_add_idle(G_SOURCE_FUNC(idle_update_pages), device);
+    C_TRAIL("OnvifDevice__get_last_error");
+    if (OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE &&
+        OnvifMgrDeviceRow__is_selected(device)) {
+      C_TRAIL("safely_start_spinner");
+      safely_start_spinner(app->player_loading_handle);
+      C_TRAIL("g_object_ref");
+      g_object_ref(device);
+      C_TRAIL("_play_onvif_stream");
+      _play_onvif_stream(device);
+      C_TRAIL("finished");
     }
 
     return 1;
@@ -368,11 +394,18 @@ void _onvif_authentication_reload(void * user_data){
         free(event);
         return;
     }
+    C_DEBUG("_onvif_authentication_reload - device is valid\n");
 
-    if(onvif_reload_device(device)){
+
+    if (onvif_reload_device(device)) {
+        C_DEBUG("_onvif_authentication_reload - device reloaded\n");
         gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),OnvifMgrDeviceRow__get_app(device)->cred_dialog);
         g_object_unref(device);
     }
+    // C_DEBUG("_onvif_authentication_reload - done(1)\n");
+    free(event);
+    // free(device);
+    C_DEBUG("_onvif_authentication_reload - done(2)\n");
 }
 
 void dialog_login_cb(AppDialogEvent * event){
