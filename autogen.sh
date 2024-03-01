@@ -974,6 +974,9 @@ else
     exit 1
 fi
 
+sed -i "s@# xsd__duration = #import \"custom\\/duration.h\" | xsd__duration@xsd__duration = #import \"custom\\/duration.h\" | xsd__duration@g" $SUBPROJECT_DIR/OnvifSoapLib/wsdl/types.dat
+
+
 #Git is up to date, now check if built
 if [ $force_rebuild -eq 0 ]; then
   ONVIFSOAP_PKG=$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
